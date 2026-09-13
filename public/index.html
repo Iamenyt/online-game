@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <title>Online Game</title>
+
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #222;
+        }
+
+        canvas {
+            display: block;
+            background: #333;
+        }
+    </style>
+</head>
+
+<body>
+
+<canvas id="game"></canvas>
+
+<script src="/socket.io/socket.io.js"></script>
+
+<script>
+const socket = io();
+
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+const players = {};
+
+let myId = null;
+
+const me = {
+    x: 100,
+    y: 100
+};
+
+socket.on("connect", () => {
+    myId = socket.id;
+});
+
+socket.on("currentPlayers", (serverPlayers) => {
+
+    for (const id in serverPlayers) {
+
+        players[id] = {
+            x: serverPlayers[id].x,
+            y: serverPlayers[id].y
+        };
+
+    }
+});
+
+socket.on("playerJoined", (data) => {
+
+    players[data.id] = {
+        x: data.player.x,
+        y: data.player.y
+    };
+
+});
+
+socket.on("playerMoved", (data) => {
+
+    if (!players[data.id]) {
+        players[data.id] = {};
+    }
+
+    players[data.id].x = data.x;
+    players[data.id].y = data.y;
+
+});
+
+socket.on("playerLeft", (id) => {
+
+    delete players[id];
+
+});
+
+const keys = {};
+
+document.addEventListener("keydown", (event) => {
+    keys[event.key.toLowerCase()] = true;
+});
+
+document.addEventListener("keyup", (event) => {
+    keys[event.key.toLowerCase()] = false;
+});
+
+function update() {
+
+    const speed = 5;
+
+    if (keys["w"]) me.y -= speed;
+    if (keys["s"]) me.y += speed;
+    if (keys["a"]) me.x -= speed;
+    if (keys["d"]) me.x += speed;
+
+    socket.emit("move", {
+        x: me.x,
+        y: me.y
+    });
+}
+
+function draw() {
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    for (const id in players) {
+
+        const player = players[id];
+
+        ctx.fillStyle = id === myId ? "lime" : "red";
+
+        ctx.fillRect(
+            player.x,
+            player.y,
+            40,
+            40
+        );
+    }
+
+    ctx.fillStyle = "white";
+    ctx.font = "20px Arial";
+
+    ctx.fillText(
+        "WASD للتحرك",
+        20,
+        30
+    );
+}
+
+function gameLoop() {
+
+    update();
+
+    players[myId] = {
+        x: me.x,
+        y: me.y
+    };
+
+    draw();
+
+    requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
+
+</body>
+</html>
